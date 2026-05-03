@@ -177,6 +177,20 @@ git:
   run_branch_prefix: attractor/run
   commit_per_node: true
 
+visibility:
+  holdouts:
+    scenarios:
+      paths:
+        - products/serenity/cli/SCENARIOS.md
+      visible:
+        nodes: [final_report]
+        classes: [review, qa]
+      scan:
+        worktree_globs:
+          - .ai/runs/$KILROY_RUN_ID/**
+        deny_patterns:
+          - SCENARIOS\.md
+
 runtime_policy:
   stage_timeout_ms: 0
   stall_timeout_ms: 600000
@@ -199,6 +213,7 @@ Important:
 - `cxdb.binary_addr`, `cxdb.http_base_url`, and `modeldb.openrouter_model_info_path` are required.
 - Deprecated compatibility: `modeldb.litellm_catalog_*` keys are still accepted for one release.
 - Config can be YAML or JSON.
+- `visibility.holdouts` is a behavioral guardrail for exact tracked files: hidden by default, visible only to selected node IDs/classes, restored before checkpointing, and scanned for accidental contamination. It is not a hard OS permission boundary.
 
 ### 5) Run the pipeline
 
@@ -324,6 +339,7 @@ Run config policy takes precedence over env tuning:
 
 - `runtime_policy.*` controls stage timeout, stall watchdog, and LLM retry cap.
 - `preflight.prompt_probes.*` controls prompt-probe enablement, transports, and probe policy.
+- `visibility.holdouts.*` controls behavioral file holdouts. Kilroy writes `holdouts_manifest.json` at the run root and `holdout_report.json` beside node artifacts.
 
 Kimi compatibility note:
 
