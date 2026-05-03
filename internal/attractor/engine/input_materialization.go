@@ -210,6 +210,9 @@ func materializeInputClosure(ctx context.Context, opts InputMaterializationOptio
 		candidates = dedupeDiscoveredReferences(candidates)
 		discovered = append(discovered, candidates...)
 		for _, ref := range candidates {
+			if isLikelyArtifactInputPath(ref.Pattern) {
+				continue
+			}
 			matches, matchErr := resolveInputReferenceCandidate(ref, current, roots, opts.ExistingSourceTargetMap)
 			if matchErr != nil {
 				warnings = append(warnings, matchErr.Error())
