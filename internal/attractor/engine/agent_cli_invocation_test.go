@@ -116,6 +116,12 @@ func TestDefaultCLIInvocation_OpenAI_DoesNotUseDeprecatedAskForApproval(t *testi
 	if !hasArg(args, "--json") {
 		t.Fatalf("expected --json: %v", args)
 	}
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--sandbox" && args[i+1] == "danger-full-access" {
+			return
+		}
+	}
+	t.Fatalf("expected --sandbox danger-full-access so Codex can use git worktrees and browser validation under Kilroy: %v", args)
 }
 
 func TestBuildCodexIsolatedEnv_ConfiguresCodexScopedOverrides(t *testing.T) {
@@ -190,6 +196,33 @@ func TestBuildCodexIsolatedEnv_ConfiguresCodexScopedOverrides(t *testing.T) {
 	// When the apikey path writes a fresh auth.json it uses 0o600. Either
 	// mode is fine; we mainly care that the file was written.
 	_ = authInfo
+}
+
+func TestBuildCodexIsolatedEnv_ReusesHostPlaywrightBrowserCache(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	browserCache := filepath.Join(home, "Library", "Caches", "ms-playwright")
+	if err := os.MkdirAll(browserCache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("OPENAI_API_KEY", "sk-test")
+	t.Setenv("PLAYWRIGHT_BROWSERS_PATH", "")
+	t.Setenv("KILROY_CODEX_STATE_BASE", filepath.Join(t.TempDir(), "codex-state-base"))
+
+	env, meta, err := buildCodexIsolatedEnv(t.TempDir(), os.Environ())
+	if err != nil {
+		t.Fatalf("buildCodexIsolatedEnv: %v", err)
+	}
+
+	if got := envLookup(env, "PLAYWRIGHT_BROWSERS_PATH"); got != browserCache {
+		t.Fatalf("PLAYWRIGHT_BROWSERS_PATH: got %q want %q", got, browserCache)
+	}
+	if got := strings.TrimSpace(anyToString(meta["playwright_browsers_path"])); got != browserCache {
+		t.Fatalf("meta playwright_browsers_path: got %q want %q", got, browserCache)
+	}
 }
 
 func TestBuildCodexIsolatedEnv_SeedsFromUserProfileWhenHomeUnset(t *testing.T) {

@@ -53,6 +53,28 @@ func TestInputMaterialization_TransitiveReferenceClosureIncludesReferencedFiles(
 	assertExists(t, filepath.Join(target, "tests.md"))
 }
 
+func TestInputMaterialization_DoesNotFollowArtifactGlobReferences(t *testing.T) {
+	source := t.TempDir()
+	target := t.TempDir()
+	mustWriteInputFile(t, filepath.Join(source, "docs", "spec.md"), "Ignore pattern: `**/node_modules/**`\n")
+	mustWriteInputFile(t, filepath.Join(source, "node_modules", "pkg", "README.md"), "dependency docs\n")
+
+	manifest, err := materializeInputClosure(context.Background(), InputMaterializationOptions{
+		SourceRoots:      []string{source},
+		Include:          []string{"docs/spec.md"},
+		FollowReferences: true,
+		TargetRoot:       target,
+	})
+	if err != nil {
+		t.Fatalf("materializeInputClosure: %v", err)
+	}
+	assertExists(t, filepath.Join(target, "docs", "spec.md"))
+	assertNotExists(t, filepath.Join(target, "node_modules", "pkg", "README.md"))
+	if len(manifest.ResolvedFiles) != 1 || manifest.ResolvedFiles[0] != "docs/spec.md" {
+		t.Fatalf("resolved files = %v, want only docs/spec.md", manifest.ResolvedFiles)
+	}
+}
+
 func TestInputMaterialization_RecursiveChainIncludesAllFiles(t *testing.T) {
 	source := t.TempDir()
 	target := t.TempDir()
@@ -283,5 +305,12 @@ func mustWriteInputFile(t *testing.T, path string, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func assertNotExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected %s not to exist, stat err=%v", path, err)
 	}
 }
