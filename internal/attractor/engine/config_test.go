@@ -141,6 +141,63 @@ func TestLoadRunConfigFile_RejectsUnknownJSONTopLevelKey(t *testing.T) {
 	}
 }
 
+func TestLoadRunConfigFile_VisibilityHoldouts(t *testing.T) {
+	dir := t.TempDir()
+	yml := filepath.Join(dir, "run.yaml")
+	if err := os.WriteFile(yml, []byte(`
+version: 1
+repo:
+  path: /tmp/repo
+cxdb:
+  binary_addr: 127.0.0.1:9009
+  http_base_url: http://127.0.0.1:9010
+llm:
+  providers:
+    openai:
+      backend: api
+modeldb:
+  openrouter_model_info_path: /tmp/catalog.json
+visibility:
+  holdouts:
+    scenarios:
+      paths:
+        - products/serenity/cli/SCENARIOS.md
+      visible:
+        nodes:
+          - final_report
+        classes:
+          - review
+      scan:
+        worktree_globs:
+          - .ai/runs/$KILROY_RUN_ID/**
+        deny_patterns:
+          - SCENARIOS\.md
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadRunConfigFile(yml)
+	if err != nil {
+		t.Fatalf("LoadRunConfigFile: %v", err)
+	}
+	holdout := cfg.Visibility.Holdouts["scenarios"]
+	if len(holdout.Paths) != 1 || holdout.Paths[0] != "products/serenity/cli/SCENARIOS.md" {
+		t.Fatalf("paths = %v", holdout.Paths)
+	}
+	if len(holdout.Visible.Nodes) != 1 || holdout.Visible.Nodes[0] != "final_report" {
+		t.Fatalf("visible nodes = %v", holdout.Visible.Nodes)
+	}
+	if len(holdout.Visible.Classes) != 1 || holdout.Visible.Classes[0] != "review" {
+		t.Fatalf("visible classes = %v", holdout.Visible.Classes)
+	}
+	if len(holdout.Scan.WorktreeGlobs) != 1 || holdout.Scan.WorktreeGlobs[0] != ".ai/runs/$KILROY_RUN_ID/**" {
+		t.Fatalf("worktree globs = %v", holdout.Scan.WorktreeGlobs)
+	}
+	if len(holdout.Scan.DenyPatterns) != 1 || holdout.Scan.DenyPatterns[0] != `SCENARIOS\.md` {
+		t.Fatalf("deny patterns = %v", holdout.Scan.DenyPatterns)
+	}
+}
+
 func TestLoadRunConfigFile_AllowsGraphAndTaskMetadata(t *testing.T) {
 	dir := t.TempDir()
 	yml := filepath.Join(dir, "run.yaml")

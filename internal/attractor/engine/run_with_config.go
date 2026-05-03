@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/danshapiro/kilroy/internal/attractor/model"
-	"github.com/danshapiro/kilroy/internal/attractor/runtime"
 	"github.com/danshapiro/kilroy/internal/attractor/modeldb"
+	"github.com/danshapiro/kilroy/internal/attractor/runtime"
 	"github.com/danshapiro/kilroy/internal/cxdb"
 )
 
@@ -21,6 +21,7 @@ type runBootstrap struct {
 	Options                 RunOptions
 	Registry                *HandlerRegistry
 	ResolvedArtifactPolicy  ResolvedArtifactPolicy
+	ResolvedHoldoutPolicy   *ResolvedHoldoutPolicy
 	Catalog                 *modeldb.Catalog
 	ModelCatalogSource      string
 	ModelCatalogPath        string
@@ -63,6 +64,7 @@ func RunWithConfig(ctx context.Context, dotSource []byte, cfg *RunConfigFile, ov
 	eng.Registry = boot.Registry // reuse the registry from validation (avoids creating a duplicate)
 	eng.RunConfig = boot.Config
 	eng.ArtifactPolicy = boot.ResolvedArtifactPolicy
+	eng.HoldoutPolicy = boot.ResolvedHoldoutPolicy
 	eng.Context = NewContextWithGraphAttrs(boot.Graph)
 	eng.AgentBackend = NewAgentRouterWithRuntimes(boot.Config, boot.Catalog, boot.Runtimes)
 	eng.CXDB = sink
@@ -283,6 +285,10 @@ func bootstrapRunWithConfig(ctx context.Context, dotSource []byte, cfg *RunConfi
 			return nil, fmt.Errorf("repo has no commits or HEAD is unresolvable: %w", err)
 		}
 	}
+	resolvedHoldoutPolicy, err := ResolveHoldoutPolicy(cfg, g, opts.RepoPath)
+	if err != nil {
+		return nil, err
+	}
 	// Ensure the logs directory is writable before expensive preflight work.
 	// Several preflight steps write into LogsRoot, but an outright unwritable
 	// path would surface as a confusing mid-preflight error instead of a clear
@@ -415,6 +421,7 @@ func bootstrapRunWithConfig(ctx context.Context, dotSource []byte, cfg *RunConfi
 		Options:                 opts,
 		Registry:                reg,
 		ResolvedArtifactPolicy:  resolvedArtifactPolicy,
+		ResolvedHoldoutPolicy:   resolvedHoldoutPolicy,
 		Catalog:                 catalog,
 		ModelCatalogSource:      modelCatalogSource,
 		ModelCatalogPath:        modelCatalogPath,

@@ -190,6 +190,10 @@ type Engine struct {
 	// artifact behavior is deterministic across retries and resumes.
 	ArtifactPolicy ResolvedArtifactPolicy
 
+	// Optional behavioral visibility policy for files that should be hidden
+	// from implementation nodes and restored before checkpointing.
+	HoldoutPolicy *ResolvedHoldoutPolicy
+
 	RunBranch string
 
 	WorktreeDir string
@@ -558,6 +562,9 @@ func (e *Engine) run(ctx context.Context) (res *Result, err error) {
 		ensureGitignoreKilroy(e.WorktreeDir)
 	}
 	if err := e.materializeRunStartupInputs(ctx); err != nil {
+		return nil, err
+	}
+	if err := e.ensureHoldoutPolicy(); err != nil {
 		return nil, err
 	}
 
@@ -1266,6 +1273,25 @@ func (e *Engine) executeNode(ctx context.Context, node *model.Node) (runtime.Out
 		_ = writeJSON(filepath.Join(stageDir, "status.json"), out)
 		return out, nil
 	}
+	holdouts, holdoutErr := e.beginHoldoutsForNode(node, stageDir)
+	if holdouts != nil {
+		defer func() {
+			if holdouts != nil {
+				_ = holdouts.restore()
+				holdouts.writeReport()
+			}
+		}()
+	}
+	if holdoutErr != nil {
+		if holdouts != nil {
+			_ = holdouts.restore()
+			holdouts.writeReport()
+			holdouts = nil
+		}
+		out := runtime.Outcome{Status: runtime.StatusFail, FailureReason: holdoutErr.Error()}
+		_ = writeJSON(filepath.Join(stageDir, "status.json"), out)
+		return out, nil
+	}
 	var (
 		out runtime.Outcome
 		err error
@@ -1312,6 +1338,15 @@ func (e *Engine) executeNode(ctx context.Context, node *model.Node) (runtime.Out
 		if parsed, decErr := runtime.DecodeOutcomeJSON(b); decErr == nil {
 			out = parsed
 		}
+	}
+	if holdouts != nil {
+		holdouts.scanResult = holdouts.scan(e.HoldoutPolicy)
+		out = applyHoldoutContamination(out, holdouts.scanResult)
+		if restoreErr := holdouts.restore(); restoreErr != nil {
+			out = runtime.Outcome{Status: runtime.StatusFail, FailureReason: restoreErr.Error()}
+		}
+		holdouts.writeReport()
+		holdouts = nil
 	}
 	out, cerr := out.Canonicalize()
 	if cerr != nil {

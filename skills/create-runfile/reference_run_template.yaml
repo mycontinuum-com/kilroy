@@ -58,6 +58,25 @@ inputs:
     # llm_provider: openai
     # llm_model: gpt-5
 
+# Optional behavioral file holdouts. Use only for exact tracked files that
+# implementation nodes should not accidentally see. This is not a hard
+# permission boundary; selected nodes/classes can see the files, and hidden
+# nodes can be failed if deny patterns appear in artifacts.
+#
+# visibility:
+#   holdouts:
+#     scenarios:
+#       paths:
+#         - products/serenity/cli/SCENARIOS.md
+#       visible:
+#         nodes: [final_report]
+#         classes: [review, qa]
+#       scan:
+#         worktree_globs:
+#           - .ai/runs/$KILROY_RUN_ID/**
+#         deny_patterns:
+#           - SCENARIOS\.md
+
 # artifact_policy: language-specific env and checkpoint config.
 # The engine applies only what is declared here — no implicit defaults.
 # See skills/shared/profile_default_env.yaml for per-language reference values.
