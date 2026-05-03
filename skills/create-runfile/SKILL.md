@@ -73,6 +73,13 @@ Default run-config source:
   ```
 - Never put actual secret values in the run config file.
 
+5.75 Declare behavioral holdouts when agents need a scenario-blind implementation pass.
+- Use `visibility.holdouts` for exact tracked files that should be hidden from implementation nodes and visible only to review/QA/final nodes.
+- Keep this policy in run config, not DOT topology.
+- Set `visible.nodes` for specific exceptions and `visible.classes` for role-level exceptions such as `review` or `qa`.
+- Add `scan.deny_patterns` for terms that should not appear in hidden-node artifacts. Add `scan.worktree_globs` only for run-scoped artifacts that are expected to be written during hidden stages.
+- Treat holdouts as behavioral guardrails, not hard permission boundaries.
+
 6. Apply runtime defaults and safety guardrails.
 - Set `git.run_branch_prefix`, `git.commit_per_node`, and `git.require_clean` intentionally.
 - Keep `runtime_policy` explicit (`stage_timeout_ms`, `stall_timeout_ms`, retry cap).
@@ -95,6 +102,7 @@ Default run-config source:
 - Do not use fragile preflight probe timeouts for real-provider runs.
 - Do not emit local CXDB configs without `cxdb.autostart` wiring in this repository context.
 - Do not emit unsupported keys (for example: `runtime_robustness`, `provider_capability_constraints`).
+- Do not present `visibility.holdouts` as security isolation; it is for accidental exposure and contamination evidence.
 
 ## References
 

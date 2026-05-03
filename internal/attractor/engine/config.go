@@ -74,6 +74,26 @@ type InputConfig struct {
 	Materialize InputMaterializationConfig `json:"materialize,omitempty" yaml:"materialize,omitempty"`
 }
 
+type HoldoutVisibilityConfig struct {
+	Nodes   []string `json:"nodes,omitempty" yaml:"nodes,omitempty"`
+	Classes []string `json:"classes,omitempty" yaml:"classes,omitempty"`
+}
+
+type HoldoutScanConfig struct {
+	WorktreeGlobs []string `json:"worktree_globs,omitempty" yaml:"worktree_globs,omitempty"`
+	DenyPatterns  []string `json:"deny_patterns,omitempty" yaml:"deny_patterns,omitempty"`
+}
+
+type HoldoutConfig struct {
+	Paths   []string                `json:"paths,omitempty" yaml:"paths,omitempty"`
+	Visible HoldoutVisibilityConfig `json:"visible,omitempty" yaml:"visible,omitempty"`
+	Scan    HoldoutScanConfig       `json:"scan,omitempty" yaml:"scan,omitempty"`
+}
+
+type VisibilityConfig struct {
+	Holdouts map[string]HoldoutConfig `json:"holdouts,omitempty" yaml:"holdouts,omitempty"`
+}
+
 type RunConfigFile struct {
 	Version int `json:"version" yaml:"version"`
 	// Graph and Task are optional operator metadata fields used by wrappers/UI.
@@ -131,6 +151,7 @@ type RunConfigFile struct {
 	RuntimePolicy RuntimePolicyConfig `json:"runtime_policy,omitempty" yaml:"runtime_policy,omitempty"`
 	Preflight     PreflightConfig     `json:"preflight,omitempty" yaml:"preflight,omitempty"`
 	Inputs        InputConfig         `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Visibility    VisibilityConfig    `json:"visibility,omitempty" yaml:"visibility,omitempty"`
 }
 
 func LoadRunConfigFile(path string) (*RunConfigFile, error) {
@@ -298,6 +319,14 @@ func applyConfigDefaults(cfg *RunConfigFile) {
 		v := false
 		cfg.Inputs.Materialize.InferWithLLM = &v
 	}
+	for name, holdout := range cfg.Visibility.Holdouts {
+		holdout.Paths = trimNonEmpty(holdout.Paths)
+		holdout.Visible.Nodes = trimNonEmpty(holdout.Visible.Nodes)
+		holdout.Visible.Classes = trimNonEmpty(holdout.Visible.Classes)
+		holdout.Scan.WorktreeGlobs = trimNonEmpty(holdout.Scan.WorktreeGlobs)
+		holdout.Scan.DenyPatterns = trimNonEmpty(holdout.Scan.DenyPatterns)
+		cfg.Visibility.Holdouts[name] = holdout
+	}
 }
 
 func validateConfig(cfg *RunConfigFile) error {
@@ -413,6 +442,9 @@ func validateConfig(cfg *RunConfigFile) error {
 		if strings.TrimSpace(cfg.Inputs.Materialize.LLMModel) == "" {
 			return fmt.Errorf("inputs.materialize.llm_model is required when inputs.materialize.infer_with_llm=true")
 		}
+	}
+	if err := validateVisibilityConfig(cfg); err != nil {
+		return err
 	}
 	return nil
 }
