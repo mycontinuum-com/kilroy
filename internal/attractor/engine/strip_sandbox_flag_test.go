@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestReplaceSandboxMode_ReplacesExistingPair(t *testing.T) {
+	in := []string{"exec", "--json", "--sandbox", "workspace-write", "-m", "o3"}
+	got := replaceSandboxMode(in, "danger-full-access")
+	want := []string{"exec", "--json", "--sandbox", "danger-full-access", "-m", "o3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("replaceSandboxMode() = %v, want %v", got, want)
+	}
+}
+
+func TestReplaceSandboxMode_AppendsWhenMissing(t *testing.T) {
+	in := []string{"exec", "--json", "-m", "o3"}
+	got := replaceSandboxMode(in, "danger-full-access")
+	want := []string{"exec", "--json", "-m", "o3", "--sandbox", "danger-full-access"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("replaceSandboxMode() = %v, want %v", got, want)
+	}
+}
+
 func TestStripSandboxFlag(t *testing.T) {
 	in := []string{"exec", "--json", "--sandbox", "workspace-write", "-m", "o3"}
 	got := stripSandboxFlag(in)

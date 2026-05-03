@@ -1133,9 +1133,9 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 	}
 	codexSemantics := usesCodexCLISemantics(providerKey, exe)
 
-	// Disable Codex sandbox for manual box fan-in convergence nodes.
-	// git merge writes to .git/ metadata outside the worktree, which
-	// --sandbox workspace-write blocks. See github.com/danshapiro/kilroy/issues/49.
+	// Manual box fan-in convergence nodes run git merge, which writes .git/
+	// metadata outside the worktree. Use Codex's explicit full-access sandbox
+	// mode here; stripping --sandbox falls back to this CLI's read-only default.
 	isManualBoxFanIn := false
 	if codexSemantics && execCtx != nil && execCtx.Context != nil {
 		joinNodeID := strings.TrimSpace(execCtx.Context.GetString("parallel.join_node", ""))
@@ -1146,7 +1146,7 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 			}
 			if mergeMode == parallelMergeModeManualBox {
 				isManualBoxFanIn = true
-				args = stripSandboxFlag(args)
+				args = replaceSandboxMode(args, "danger-full-access")
 			}
 		}
 	}
@@ -1233,8 +1233,8 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 		inv["structured_output_schema_path"] = structuredSchemaPath
 	}
 	if isManualBoxFanIn {
-		inv["sandbox_disabled"] = true
-		inv["sandbox_disabled_reason"] = "manual_box_fan_in_convergence"
+		inv["sandbox_mode"] = "danger-full-access"
+		inv["sandbox_mode_reason"] = "manual_box_fan_in_convergence"
 	}
 	if err := writeJSON(filepath.Join(stageDir, "cli_invocation.json"), inv); err != nil {
 		return "", classifiedFailure(err, ""), nil
@@ -1669,16 +1669,31 @@ func buildCodexIsolatedEnvWithName(stageDir string, homeDirName string, baseEnv 
 		}
 	}
 
+	playwrightBrowsersPath := envValueFromBase(baseEnv, "PLAYWRIGHT_BROWSERS_PATH")
+	if playwrightBrowsersPath == "" {
+		sourceHome := codexSourceHome(baseEnv)
+		if sourceHome != "" {
+			candidate := filepath.Join(sourceHome, "Library", "Caches", "ms-playwright")
+			if stat, statErr := os.Stat(candidate); statErr == nil && stat.IsDir() {
+				playwrightBrowsersPath = candidate
+			}
+		}
+	}
+
 	// Apply codex-specific overrides on top of the base env.
 	// Toolchain paths (CARGO_HOME, RUSTUP_HOME, etc.) are already pinned
 	// in baseEnv by buildBaseNodeEnv, so they survive this HOME override.
-	env := mergeEnvWithOverrides(baseEnv, map[string]string{
+	overrides := map[string]string{
 		"HOME":            codexHome,
 		"CODEX_HOME":      codexStateRoot,
 		"XDG_CONFIG_HOME": xdgConfigHome,
 		"XDG_DATA_HOME":   xdgDataHome,
 		"XDG_STATE_HOME":  xdgStateHome,
-	})
+	}
+	if playwrightBrowsersPath != "" {
+		overrides["PLAYWRIGHT_BROWSERS_PATH"] = playwrightBrowsersPath
+	}
+	env := mergeEnvWithOverrides(baseEnv, overrides)
 
 	meta := map[string]any{
 		"state_base_root":  codexStateBaseRoot(),
@@ -1687,6 +1702,9 @@ func buildCodexIsolatedEnvWithName(stageDir string, homeDirName string, baseEnv 
 	}
 	if len(seedErrors) > 0 {
 		meta["env_seed_errors"] = seedErrors
+	}
+	if playwrightBrowsersPath != "" {
+		meta["playwright_browsers_path"] = playwrightBrowsersPath
 	}
 	return env, meta, nil
 }
@@ -2215,6 +2233,19 @@ func hasArg(args []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// replaceSandboxMode returns args with "--sandbox <mode>" set. If args already
+// include a valid --sandbox pair, only the value is replaced.
+func replaceSandboxMode(args []string, mode string) []string {
+	out := append([]string(nil), args...)
+	for i := 0; i < len(out)-1; i++ {
+		if out[i] == "--sandbox" {
+			out[i+1] = mode
+			return out
+		}
+	}
+	return append(out, "--sandbox", mode)
 }
 
 // stripSandboxFlag removes "--sandbox <value>" from a Codex CLI arg slice.

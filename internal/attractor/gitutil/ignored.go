@@ -42,14 +42,7 @@ func CopyIgnoredFiles(srcDir, dstDir string, excludePrefixes ...string) error {
 	}
 	for _, rel := range files {
 		relFwd := filepath.ToSlash(rel)
-		excluded := false
-		for _, pfx := range excludePrefixes {
-			if strings.HasPrefix(relFwd, pfx) {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
+		if shouldSkipIgnoredFileCopy(relFwd, excludePrefixes) {
 			continue
 		}
 		src := filepath.Join(srcDir, rel)
@@ -67,6 +60,28 @@ func CopyIgnoredFiles(srcDir, dstDir string, excludePrefixes ...string) error {
 		_ = copyFileMode(src, dst, info.Mode())
 	}
 	return nil
+}
+
+func shouldSkipIgnoredFileCopy(rel string, excludePrefixes []string) bool {
+	rel = filepath.ToSlash(strings.TrimSpace(rel))
+	for _, pfx := range excludePrefixes {
+		if strings.HasPrefix(rel, filepath.ToSlash(strings.TrimSpace(pfx))) {
+			return true
+		}
+	}
+	for _, segment := range strings.Split(rel, "/") {
+		if strings.HasPrefix(segment, ".cargo-target") {
+			return true
+		}
+		switch segment {
+		case ".git", ".jj", ".pnpm-store", ".pytest_cache", ".turbo", ".venv", ".wasm-pack", "__pycache__", "build", "coverage", "dist", "logs", "managed", "node_modules", "target", "venv":
+			return true
+		}
+	}
+	if strings.HasPrefix(rel, ".ai/runs/") {
+		return true
+	}
+	return false
 }
 
 func copyFileMode(src, dst string, mode fs.FileMode) error {
