@@ -219,7 +219,7 @@ Notes:
 - Prefer first-class run config policy knobs over env tuning:
   - `runtime_policy` for stage timeout, stall watchdog, and retry cap.
   - `preflight.prompt_probes` for prompt-probe mode/transports/policy.
-- Use `visibility.holdouts` when implementation nodes should not accidentally see exact tracked files such as holdout scenario docs. Holdouts are behavioral, not security sandboxing: Kilroy hides files with git skip-worktree, restores them before checkpointing, and can fail hidden nodes when configured `deny_patterns` appear in node artifacts.
+- Use `visibility.holdouts` when implementation nodes should not accidentally see tracked files such as holdout scenario docs. Paths may be exact files, directories, or glob patterns; Kilroy resolves them against tracked files only. Holdouts are behavioral, not security sandboxing: Kilroy hides files with git skip-worktree, restores them before checkpointing, and can fail hidden nodes when configured `deny_patterns` appear in node artifacts.
 
 Holdout example:
 
@@ -228,7 +228,7 @@ visibility:
   holdouts:
     scenarios:
       paths:
-        - products/serenity/cli/SCENARIOS.md
+        - products/serenity/cli/scenarios/**/*.md
       visible:
         nodes: [final_report]
         classes: [review, qa]
@@ -236,7 +236,7 @@ visibility:
         worktree_globs:
           - .ai/runs/$KILROY_RUN_ID/**
         deny_patterns:
-          - SCENARIOS\.md
+          - products/serenity/cli/scenarios/
 ```
 
 ## Provider Backends

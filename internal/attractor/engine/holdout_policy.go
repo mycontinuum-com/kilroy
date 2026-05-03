@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/danshapiro/kilroy/internal/attractor/model"
 	"github.com/danshapiro/kilroy/internal/attractor/runtime"
 )
@@ -84,7 +85,7 @@ func validateVisibilityConfig(cfg *RunConfigFile) error {
 			return fmt.Errorf("visibility.holdouts.%s.paths must contain at least one path", name)
 		}
 		for _, p := range holdout.Paths {
-			if _, err := normalizeHoldoutPath(p); err != nil {
+			if _, err := normalizeHoldoutPathSpec(p); err != nil {
 				return fmt.Errorf("visibility.holdouts.%s.paths: %w", name, err)
 			}
 		}
@@ -126,16 +127,25 @@ func ResolveHoldoutPolicy(cfg *RunConfigFile, g *model.Graph, repoPath string) (
 			ScanWorktreeGlobs: append([]string(nil), holdout.Scan.WorktreeGlobs...),
 			DenyPatterns:      append([]string(nil), holdout.Scan.DenyPatterns...),
 		}
+		trackedFiles, err := listTrackedFiles(repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("visibility.holdouts.%s could not list tracked files: %w", name, err)
+		}
+		seenPath := map[string]bool{}
 		for _, p := range holdout.Paths {
-			rel, err := normalizeHoldoutPath(p)
+			resolved, err := resolveHoldoutPaths(p, trackedFiles)
 			if err != nil {
 				return nil, fmt.Errorf("visibility.holdouts.%s.paths: %w", name, err)
 			}
-			if err := ensureGitTracked(repoPath, rel); err != nil {
-				return nil, fmt.Errorf("visibility.holdouts.%s path %q must be tracked: %w", name, rel, err)
+			for _, rel := range resolved {
+				if seenPath[rel] {
+					continue
+				}
+				seenPath[rel] = true
+				set.Paths = append(set.Paths, rel)
 			}
-			set.Paths = append(set.Paths, rel)
 		}
+		sort.Strings(set.Paths)
 		for _, nodeID := range holdout.Visible.Nodes {
 			nodeID = strings.TrimSpace(nodeID)
 			if nodeID == "" {
@@ -168,7 +178,7 @@ func ResolveHoldoutPolicy(cfg *RunConfigFile, g *model.Graph, repoPath string) (
 	return policy, nil
 }
 
-func normalizeHoldoutPath(raw string) (string, error) {
+func normalizeHoldoutPathSpec(raw string) (string, error) {
 	p := filepath.ToSlash(strings.TrimSpace(raw))
 	if p == "" {
 		return "", fmt.Errorf("path is empty")
@@ -176,14 +186,84 @@ func normalizeHoldoutPath(raw string) (string, error) {
 	if filepath.IsAbs(raw) || strings.HasPrefix(p, "/") {
 		return "", fmt.Errorf("path %q must be repo-relative", raw)
 	}
-	if strings.ContainsAny(p, "*?[") {
-		return "", fmt.Errorf("path %q must be an exact file path, not a glob", raw)
-	}
 	cleaned := path.Clean(p)
 	if cleaned == "." || strings.HasPrefix(cleaned, "../") || cleaned == ".." || strings.Contains(cleaned, "/../") {
 		return "", fmt.Errorf("path %q must stay inside the repo", raw)
 	}
-	return cleaned, nil
+	if holdoutContainsGlobMeta(p) {
+		p = strings.TrimPrefix(p, "./")
+		if !doublestar.ValidatePattern(p) {
+			return "", fmt.Errorf("path %q is not a valid glob pattern", raw)
+		}
+		return p, nil
+	}
+	return strings.TrimSuffix(cleaned, "/"), nil
+}
+
+func holdoutContainsGlobMeta(value string) bool {
+	return strings.ContainsAny(value, "*?[{")
+}
+
+func resolveHoldoutPaths(raw string, trackedFiles []string) ([]string, error) {
+	spec, err := normalizeHoldoutPathSpec(raw)
+	if err != nil {
+		return nil, err
+	}
+	if holdoutContainsGlobMeta(spec) {
+		return resolveHoldoutGlob(spec, trackedFiles)
+	}
+
+	for _, tracked := range trackedFiles {
+		if tracked == spec {
+			return []string{spec}, nil
+		}
+	}
+
+	prefix := strings.TrimSuffix(spec, "/") + "/"
+	var matches []string
+	for _, tracked := range trackedFiles {
+		if strings.HasPrefix(tracked, prefix) {
+			matches = append(matches, tracked)
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("path %q must match at least one tracked file or directory", raw)
+	}
+	return matches, nil
+}
+
+func resolveHoldoutGlob(pattern string, trackedFiles []string) ([]string, error) {
+	var matches []string
+	for _, tracked := range trackedFiles {
+		ok, err := doublestar.Match(pattern, tracked)
+		if err != nil {
+			return nil, fmt.Errorf("glob %q is invalid: %w", pattern, err)
+		}
+		if ok {
+			matches = append(matches, tracked)
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("glob %q must match at least one tracked file", pattern)
+	}
+	return matches, nil
+}
+
+func listTrackedFiles(repoPath string) ([]string, error) {
+	out, err := exec.Command("git", "-C", repoPath, "ls-files", "-z").Output()
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, part := range bytes.Split(out, []byte{0}) {
+		file := strings.TrimSpace(string(part))
+		if file == "" {
+			continue
+		}
+		files = append(files, filepath.ToSlash(file))
+	}
+	sort.Strings(files)
+	return files, nil
 }
 
 func graphHasClass(g *model.Graph, className string) bool {
