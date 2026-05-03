@@ -59,10 +59,6 @@ func (g *testGitOps) VerifyHeadSHA(worktreeDir, expectedSHA string) error {
 	return nil
 }
 
-func (g *testGitOps) CopyIgnoredFiles(src, dst string, excludePrefixes ...string) error {
-	return gitutil.CopyIgnoredFiles(src, dst, excludePrefixes...)
-}
-
 func (g *testGitOps) SetupBranchWorkspace(repoPath, worktreeDir, branchName, baseSHA string) error {
 	_ = gitutil.RemoveWorktree(repoPath, worktreeDir)
 	if err := gitutil.CreateBranchAt(repoPath, branchName, baseSHA); err != nil {

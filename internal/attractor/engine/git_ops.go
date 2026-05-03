@@ -39,10 +39,6 @@ type GitOps interface {
 	// VerifyHeadSHA checks that the current HEAD matches the expected SHA.
 	VerifyHeadSHA(worktreeDir, expectedSHA string) error
 
-	// CopyIgnoredFiles copies version-control-ignored files between directories.
-	// excludePrefixes is an optional list of path prefixes to skip.
-	CopyIgnoredFiles(src, dst string, excludePrefixes ...string) error
-
 	// SetupBranchWorkspace creates an isolated worktree for a parallel branch.
 	SetupBranchWorkspace(repoPath, worktreeDir, branchName, baseSHA string) error
 

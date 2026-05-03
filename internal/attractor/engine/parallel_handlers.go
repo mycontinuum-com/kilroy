@@ -423,6 +423,7 @@ func (h *ParallelHandler) runBranch(ctx context.Context, exec *Execution, parall
 		Graph:                      exec.Graph,
 		Options:                    exec.Engine.Options,
 		DotSource:                  exec.Engine.DotSource,
+		RunConfig:                  exec.Engine.RunConfig,
 		GitOps:                     exec.Engine.GitOps,
 		RunBranch:                  branchName,
 		WorktreeDir:                worktreeDir,
@@ -488,9 +489,17 @@ func (h *ParallelHandler) runBranch(ctx context.Context, exec *Execution, parall
 	if exec.Engine.GitOps != nil {
 		// Input materialization may overwrite the .git file — repair it.
 		_ = exec.Engine.GitOps.RepairWorktree(exec.Engine.Options.RepoPath, worktreeDir)
-		// Copy gitignored files (e.g. .env, secrets) from the parent worktree.
-		if err := exec.Engine.GitOps.CopyIgnoredFiles(exec.WorktreeDir, worktreeDir); err != nil {
-			emitBranchProgress("branch_ignored_files_warning", map[string]any{"warning": err.Error()})
+	}
+	if err := branchEng.executeSetupCommands(ctx); err != nil {
+		return parallelBranchResult{
+			BranchKey:   key,
+			BranchName:  branchName,
+			StartNodeID: edge.To,
+			StopNodeID:  joinID,
+			LogsRoot:    branchRoot,
+			WorktreeDir: worktreeDir,
+			Error:       err.Error(),
+			Outcome:     runtime.Outcome{Status: runtime.StatusFail, FailureReason: err.Error()},
 		}
 	}
 	if branchEng.CXDB != nil {
@@ -591,18 +600,6 @@ func (h *FanInHandler) Execute(ctx context.Context, exec *Execution, node *model
 		if strings.TrimSpace(winner.HeadSHA) != "" {
 			if err := exec.Engine.GitOps.MergeBranch(exec.WorktreeDir, winner.HeadSHA); err != nil {
 				return runtime.Outcome{Status: runtime.StatusFail, FailureReason: err.Error()}, nil
-			}
-		}
-		// Copy git-ignored files from the winner branch worktree.
-		// .ai/runs/ is excluded — managed by the lineage system below.
-		if strings.TrimSpace(winner.WorktreeDir) != "" {
-			if err := exec.Engine.GitOps.CopyIgnoredFiles(winner.WorktreeDir, exec.WorktreeDir, ".ai/runs/"); err != nil {
-				exec.Engine.appendProgress(map[string]any{
-					"event":      "fan_in_ignored_files_warning",
-					"node_id":    node.ID,
-					"winner_key": winner.BranchKey,
-					"warning":    err.Error(),
-				})
 			}
 		}
 	} else if strings.TrimSpace(winner.WorktreeDir) != "" {

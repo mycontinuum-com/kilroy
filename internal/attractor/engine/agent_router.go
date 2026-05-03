@@ -1431,6 +1431,7 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 		}
 	}
 
+	var structuredOutcome *runtime.Outcome
 	if runErr == nil && codexSemantics && hasArg(runArgs, "--output-schema") && strings.TrimSpace(structuredOutPath) != "" {
 		unknownKeys, payload, contractErr := inspectCodexStructuredOutputContract(structuredOutPath)
 		if contractErr != nil {
@@ -1463,6 +1464,13 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 			exitCode = retryExitCode
 			dur += retryDur
 			runArgs = retryArgs
+		}
+		if len(unknownKeys) == 0 {
+			if parsedOutcome, outcomeErr := outcomeFromCodexStructuredOutput(payload); outcomeErr != nil {
+				return "", classifiedFailure(outcomeErr, readStderr()), nil
+			} else {
+				structuredOutcome = parsedOutcome
+			}
 		}
 	}
 
@@ -1577,6 +1585,9 @@ func (r *AgentRouter) runCLI(ctx context.Context, execCtx *Execution, node *mode
 			}, nil
 		}
 		return outStr, classifiedFailure(runErr, readStderr()), nil
+	}
+	if structuredOutcome != nil {
+		return outStr, structuredOutcome, nil
 	}
 	return outStr, nil, nil
 }
@@ -2234,7 +2245,15 @@ const defaultCodexOutputSchema = `{
   "type": "object",
   "properties": {
     "final": { "type": "string" },
-    "summary": { "type": "string" }
+    "summary": { "type": "string" },
+    "status": { "type": "string" },
+    "preferred_label": { "type": "string" },
+    "suggested_next_ids": { "type": "array", "items": { "type": "string" } },
+    "context_updates": { "type": "object" },
+    "notes": { "type": "string" },
+    "failure_reason": { "type": "string" },
+    "failure_class": { "type": "string" },
+    "failure_signature": { "type": "string" }
   },
   "required": ["final", "summary"],
   "additionalProperties": false
@@ -2269,13 +2288,41 @@ func inspectCodexStructuredOutputContract(outputPath string) ([]string, map[stri
 	}
 	unknown := make([]string, 0)
 	for key := range payload {
-		if key == "final" || key == "summary" {
+		if isKnownCodexStructuredOutputKey(key) {
 			continue
 		}
 		unknown = append(unknown, key)
 	}
 	sort.Strings(unknown)
 	return unknown, payload, nil
+}
+
+func isKnownCodexStructuredOutputKey(key string) bool {
+	switch key {
+	case "final", "summary", "status", "preferred_label", "suggested_next_ids", "context_updates", "notes", "failure_reason", "failure_class", "failure_signature":
+		return true
+	default:
+		return false
+	}
+}
+
+func outcomeFromCodexStructuredOutput(payload map[string]any) (*runtime.Outcome, error) {
+	status := strings.TrimSpace(fmt.Sprint(payload["status"]))
+	if status == "" || status == "<nil>" {
+		return nil, nil
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	out, err := runtime.DecodeOutcomeJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(out.Notes) == "" {
+		out.Notes = strings.TrimSpace(fmt.Sprint(payload["summary"]))
+	}
+	return &out, nil
 }
 
 func isStateDBDiscrepancy(stderr string) bool {

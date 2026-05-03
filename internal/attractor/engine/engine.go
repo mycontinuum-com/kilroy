@@ -531,11 +531,12 @@ func (e *Engine) run(ctx context.Context) (res *Result, err error) {
 			"branch":   e.RunBranch,
 			"base_sha": e.baseSHA,
 		})
-		// Copy gitignored files (e.g. .env, secrets, local configs) from the
-		// source repo into the run worktree.
-		if err := e.GitOps.CopyIgnoredFiles(e.Options.RepoPath, e.WorktreeDir); err != nil {
-			e.Warn(fmt.Sprintf("copy ignored files to run worktree: %v", err))
-		}
+		e.appendProgress(map[string]any{
+			"event":    "worktree_created",
+			"path":     e.WorktreeDir,
+			"branch":   e.RunBranch,
+			"base_sha": e.baseSHA,
+		})
 	} else {
 		// No-git mode: ensure workspace directory exists.
 		if err := os.MkdirAll(e.WorktreeDir, 0o755); err != nil {
