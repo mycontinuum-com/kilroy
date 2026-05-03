@@ -74,7 +74,7 @@ Default run-config source:
 - Never put actual secret values in the run config file.
 
 5.75 Declare behavioral holdouts when agents need a scenario-blind implementation pass.
-- Use `visibility.holdouts` for exact tracked files that should be hidden from implementation nodes and visible only to review/QA/final nodes.
+- Use `visibility.holdouts` for tracked files that should be hidden from implementation nodes and visible only to review/QA/final nodes. Paths may be exact files, directories, or glob patterns; Kilroy resolves them against tracked files only.
 - Keep this policy in run config, not DOT topology.
 - Set `visible.nodes` for specific exceptions and `visible.classes` for role-level exceptions such as `review` or `qa`.
 - Add `scan.deny_patterns` for terms that should not appear in hidden-node artifacts. Add `scan.worktree_globs` only for run-scoped artifacts that are expected to be written during hidden stages.

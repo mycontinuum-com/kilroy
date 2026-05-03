@@ -60,6 +60,103 @@ func TestResolveHoldoutPolicyRejectsUntrackedPath(t *testing.T) {
 	}
 }
 
+func TestResolveHoldoutPolicyExpandsDirectoryToTrackedFiles(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "docs/scenarios/a.md", "a\n")
+	writeAndCommitHoldout(t, repo, "docs/scenarios/nested/b.md", "b\n")
+	writeAndCommitHoldout(t, repo, "docs/other.md", "other\n")
+	g := graphWithHoldoutNodes(t)
+	cfg := runConfigWithHoldout(repo, "docs/scenarios")
+
+	policy, err := ResolveHoldoutPolicy(cfg, g, repo)
+	if err != nil {
+		t.Fatalf("ResolveHoldoutPolicy: %v", err)
+	}
+	got := strings.Join(policy.Sets[0].Paths, ",")
+	want := "docs/scenarios/a.md,docs/scenarios/nested/b.md"
+	if got != want {
+		t.Fatalf("resolved paths = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHoldoutPolicyExpandsGlobToTrackedFiles(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "products/serenity/cli/scenarios/operator-scenarios.md", "operator\n")
+	writeAndCommitHoldout(t, repo, "products/serenity/cli/scenarios/release-scenarios.md", "release\n")
+	writeAndCommitHoldout(t, repo, "products/serenity/cli/scenarios/index.yaml", "version: 1\n")
+	g := graphWithHoldoutNodes(t)
+	cfg := runConfigWithHoldout(repo, "products/serenity/cli/scenarios/**/*.md")
+
+	policy, err := ResolveHoldoutPolicy(cfg, g, repo)
+	if err != nil {
+		t.Fatalf("ResolveHoldoutPolicy: %v", err)
+	}
+	got := strings.Join(policy.Sets[0].Paths, ",")
+	want := "products/serenity/cli/scenarios/operator-scenarios.md,products/serenity/cli/scenarios/release-scenarios.md"
+	if got != want {
+		t.Fatalf("resolved paths = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHoldoutPolicyExpandsMixedPathsAndDedupes(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "docs/a.md", "a\n")
+	writeAndCommitHoldout(t, repo, "docs/b.md", "b\n")
+	writeAndCommitHoldout(t, repo, "docs/c.txt", "c\n")
+	g := graphWithHoldoutNodes(t)
+	cfg := runConfigWithHoldout(repo, "docs/a.md")
+	cfg.Visibility.Holdouts["scenarios"] = HoldoutConfig{
+		Paths: []string{"docs/a.md", "docs/**/*.md", "docs"},
+		Visible: HoldoutVisibilityConfig{
+			Classes: []string{"review"},
+		},
+	}
+
+	policy, err := ResolveHoldoutPolicy(cfg, g, repo)
+	if err != nil {
+		t.Fatalf("ResolveHoldoutPolicy: %v", err)
+	}
+	got := strings.Join(policy.Sets[0].Paths, ",")
+	want := "docs/a.md,docs/b.md,docs/c.txt"
+	if got != want {
+		t.Fatalf("resolved paths = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHoldoutPolicyRejectsZeroMatchDirectoryOrGlob(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "docs/a.md", "a\n")
+	g := graphWithHoldoutNodes(t)
+
+	for _, rel := range []string{"missing", "docs/**/*.yaml"} {
+		t.Run(rel, func(t *testing.T) {
+			cfg := runConfigWithHoldout(repo, rel)
+			_, err := ResolveHoldoutPolicy(cfg, g, repo)
+			if err == nil {
+				t.Fatal("expected zero-match holdout path to fail")
+			}
+			if !strings.Contains(err.Error(), "match at least one tracked") {
+				t.Fatalf("expected zero-match error, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestResolveHoldoutPolicyRejectsEscapingGlob(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "docs/a.md", "a\n")
+	g := graphWithHoldoutNodes(t)
+	cfg := runConfigWithHoldout(repo, "../**/*.md")
+
+	_, err := ResolveHoldoutPolicy(cfg, g, repo)
+	if err == nil {
+		t.Fatal("expected escaping holdout glob to fail")
+	}
+	if !strings.Contains(err.Error(), "inside the repo") {
+		t.Fatalf("expected inside-repo error, got: %v", err)
+	}
+}
+
 func TestEngineExecuteNodeHidesAndRestoresHoldoutForHiddenNode(t *testing.T) {
 	repo := initTestRepo(t)
 	writeAndCommitHoldout(t, repo, "SCENARIOS.md", "secret scenario\n")
@@ -83,6 +180,30 @@ func TestEngineExecuteNodeHidesAndRestoresHoldoutForHiddenNode(t *testing.T) {
 	}
 	if out := runCmdOut(t, repo, "git", "ls-files", "-v", "--", "SCENARIOS.md"); strings.HasPrefix(out, "S") {
 		t.Fatalf("skip-worktree flag still set: %q", out)
+	}
+}
+
+func TestEngineExecuteNodeHidesAndRestoresGlobResolvedHoldouts(t *testing.T) {
+	repo := initTestRepo(t)
+	writeAndCommitHoldout(t, repo, "docs/scenarios/operator.md", "operator\n")
+	writeAndCommitHoldout(t, repo, "docs/scenarios/release.md", "release\n")
+	g := graphWithHoldoutNodes(t)
+	cfg := runConfigWithHoldout(repo, "docs/scenarios/**/*.md")
+	handler := &holdoutProbeHandler{t: t, path: "docs/scenarios/operator.md", wantVisible: false}
+	eng := newHoldoutTestEngine(t, g, repo, cfg, handler)
+
+	out, err := executeHoldoutNode(t, eng, g.Nodes["implementation"])
+	if err != nil {
+		t.Fatalf("executeNode: %v", err)
+	}
+	if out.Status != runtime.StatusSuccess {
+		t.Fatalf("status = %q, want success", out.Status)
+	}
+	if got := readHoldoutFile(t, filepath.Join(repo, "docs/scenarios/operator.md")); got != "operator\n" {
+		t.Fatalf("restored operator content = %q", got)
+	}
+	if got := readHoldoutFile(t, filepath.Join(repo, "docs/scenarios/release.md")); got != "release\n" {
+		t.Fatalf("restored release content = %q", got)
 	}
 }
 
@@ -188,6 +309,9 @@ func executeHoldoutNode(t *testing.T, eng *Engine, node *model.Node) (runtime.Ou
 
 func writeAndCommitHoldout(t *testing.T, repo string, rel string, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, rel)), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(repo, rel), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -181,7 +181,7 @@ visibility:
   holdouts:
     scenarios:
       paths:
-        - products/serenity/cli/SCENARIOS.md
+        - products/serenity/cli/scenarios/**/*.md
       visible:
         nodes: [final_report]
         classes: [review, qa]
@@ -189,7 +189,7 @@ visibility:
         worktree_globs:
           - .ai/runs/$KILROY_RUN_ID/**
         deny_patterns:
-          - SCENARIOS\.md
+          - products/serenity/cli/scenarios/
 
 runtime_policy:
   stage_timeout_ms: 0
@@ -213,7 +213,7 @@ Important:
 - `cxdb.binary_addr`, `cxdb.http_base_url`, and `modeldb.openrouter_model_info_path` are required.
 - Deprecated compatibility: `modeldb.litellm_catalog_*` keys are still accepted for one release.
 - Config can be YAML or JSON.
-- `visibility.holdouts` is a behavioral guardrail for exact tracked files: hidden by default, visible only to selected node IDs/classes, restored before checkpointing, and scanned for accidental contamination. It is not a hard OS permission boundary.
+- `visibility.holdouts` is a behavioral guardrail for tracked files: exact files, directories, or glob patterns are resolved against tracked files, hidden by default, visible only to selected node IDs/classes, restored before checkpointing, and scanned for accidental contamination. It is not a hard OS permission boundary.
 
 ### 5) Run the pipeline
 
