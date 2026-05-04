@@ -1146,7 +1146,7 @@ func TestRunWithConfig_PreflightPromptProbe_CLIStdinMode(t *testing.T) {
 set -euo pipefail
 if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
 cat <<'EOF'
-Usage: codex exec --json --sandbox workspace-write
+Usage: codex exec --json --sandbox danger-full-access
 EOF
 exit 0
 fi
@@ -1214,7 +1214,7 @@ func TestRunWithConfig_PreflightPromptProbe_CLIUsesProductionRetryPath(t *testin
 set -euo pipefail
 if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
 cat <<'EOF'
-Usage: codex exec --json --sandbox workspace-write
+Usage: codex exec --json --sandbox danger-full-access
 EOF
 exit 0
 fi
@@ -1868,7 +1868,7 @@ func TestRunWithConfig_PreflightPromptProbe_SkipsCodexWhenNoAPIKey(t *testing.T)
 set -euo pipefail
 if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
 cat <<'EOF'
-Usage: codex exec --json --sandbox workspace-write
+Usage: codex exec --json --sandbox danger-full-access
 EOF
 exit 0
 fi

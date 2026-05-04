@@ -20,7 +20,7 @@ Although bringing your own agentic loop and unified LLM SDK is not required to b
   - Reference prompt scratch files under `.ai/runs/$KILROY_RUN_ID/...`.
   - Root `.ai` is not implicitly ingested into run or branch worktrees.
 - OpenAI codex CLI invocation:
-  - Default args use `codex exec --json --sandbox workspace-write ...`.
+  - Default args use `codex exec --json --sandbox danger-full-access ...`.
   - Deprecated `--ask-for-approval` is intentionally not used.
   - Attractor isolates Codex runtime state per stage (`env_mode=isolated`, `env_scope=codex`, stage-local `state_root`).
   - Sensitive Codex state roots (`codex-home*`, `.codex/auth.json`, `.codex/config.toml`) are excluded from `stage.tgz` and `run.tgz`.

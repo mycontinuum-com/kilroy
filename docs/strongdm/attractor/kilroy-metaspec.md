@@ -365,7 +365,7 @@ This section documents *current known* headless interfaces for the three target 
 - Model override: `--model, -m`
 - Working directory: `--cd, -C`
 - Non-interactive execution:
-  - `codex exec --json --sandbox workspace-write ...` is sufficient for non-interactive runs
+  - `codex exec --json --sandbox danger-full-access ...` is sufficient for non-interactive runs
   - `--skip-git-repo-check` is only required when running outside a trusted git repository
 - Structured final output: `--output-schema <schema.json> -o <output.json>` writes final JSON output to a file.
 - Resume: `codex exec resume [SESSION_ID]` or `codex exec resume --last [PROMPT]`

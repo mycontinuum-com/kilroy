@@ -243,7 +243,7 @@ visibility:
 
 CLI backend mappings:
 
-- `openai` -> `codex exec --json --sandbox workspace-write -m <model> -C <worktree>`
+- `openai` -> `codex exec --json --sandbox danger-full-access -m <model> -C <worktree>`
 - `anthropic` -> `claude -p --dangerously-skip-permissions --output-format stream-json --verbose --model <model> "<prompt>"`
 - `google` -> `gemini -p --output-format stream-json --yolo --model <model> "<prompt>"`
 

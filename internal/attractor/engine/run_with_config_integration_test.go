@@ -24,7 +24,7 @@ func writeFakeCodexHelpCLI(t *testing.T) string {
 	if err := os.WriteFile(p, []byte(`#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
-  echo "Usage: codex exec --json --sandbox workspace-write"
+  echo "Usage: codex exec --json --sandbox danger-full-access"
   exit 0
 fi
 echo "ok"

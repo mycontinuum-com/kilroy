@@ -194,7 +194,7 @@ set -euo pipefail
 count_file="${KILROY_CALL_COUNT_FILE:?missing call count file}"
 if [[ "${1:-}" == "exec" && "${2:-}" == "--help" ]]; then
 cat <<'EOF'
-Usage: codex exec --json --sandbox workspace-write -m MODEL -C DIR
+Usage: codex exec --json --sandbox danger-full-access -m MODEL -C DIR
 EOF
 exit 0
 fi
