@@ -16,7 +16,7 @@ var builtinSpecs = map[string]Spec{
 			InvocationTemplate: []string{"exec", "--json", "--sandbox", "danger-full-access", "-m", "{{model}}", "-C", "{{worktree}}"},
 			PromptMode:         "stdin",
 			HelpProbeArgs:      []string{"exec", "--help"},
-			CapabilityAll:      []string{"--json"},
+			CapabilityAll:      []string{"--json", "--sandbox"},
 		},
 	},
 	"codex-app-server": {

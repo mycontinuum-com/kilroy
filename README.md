@@ -308,7 +308,7 @@ Provider runtime architecture:
 
 CLI backend command mappings:
 
-- `openai` -> `codex exec --json --sandbox workspace-write ...`
+- `openai` -> `codex exec --json --sandbox danger-full-access ...`
 - `anthropic` -> `claude -p --output-format stream-json ...`
 - `google` -> `gemini -p --output-format stream-json --yolo ...`
 
