@@ -24,7 +24,14 @@ func TestDefaultCodexOutputSchema_DisallowsAdditionalPropertiesAndRequiresCoreFi
 	if !ok {
 		t.Fatalf("required should be an array: %#v", schema["required"])
 	}
-	want := map[string]bool{"final": true, "summary": true}
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties should be an object: %#v", schema["properties"])
+	}
+	want := map[string]bool{}
+	for key := range props {
+		want[key] = true
+	}
 	if len(req) != len(want) {
 		t.Fatalf("required length: got %d want %d (%#v)", len(req), len(want), req)
 	}
@@ -33,6 +40,17 @@ func TestDefaultCodexOutputSchema_DisallowsAdditionalPropertiesAndRequiresCoreFi
 		if !want[s] {
 			t.Fatalf("unexpected required key %q (all=%#v)", s, req)
 		}
+	}
+
+	contextUpdates, ok := props["context_updates"].(map[string]any)
+	if !ok {
+		t.Fatalf("context_updates should be an object schema: %#v", props["context_updates"])
+	}
+	if got, ok := contextUpdates["additionalProperties"].(bool); !ok || got {
+		t.Fatalf("context_updates.additionalProperties: got %#v want false", contextUpdates["additionalProperties"])
+	}
+	if _, ok := contextUpdates["properties"].(map[string]any); !ok {
+		t.Fatalf("context_updates.properties should be an object: %#v", contextUpdates["properties"])
 	}
 }
 
@@ -99,7 +117,8 @@ digraph G {
   start [shape=Mdiamond]
   exit  [shape=Msquare]
   a [shape=box, llm_provider=openai, llm_model=gpt-5.4, prompt="say hi"]
-  start -> a -> exit
+  start -> a
+  a -> exit [condition="outcome=success"]
 }
 `)
 
@@ -190,7 +209,8 @@ digraph G {
   start [shape=Mdiamond]
   exit  [shape=Msquare]
   a [shape=box, llm_provider=openai, llm_model=gpt-5.4, prompt="say hi"]
-  start -> a -> exit
+  start -> a
+  a -> exit [condition="outcome=success"]
 }
 `)
 

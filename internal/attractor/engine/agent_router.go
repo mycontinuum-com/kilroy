@@ -2280,13 +2280,24 @@ const defaultCodexOutputSchema = `{
     "status": { "type": "string" },
     "preferred_label": { "type": "string" },
     "suggested_next_ids": { "type": "array", "items": { "type": "string" } },
-    "context_updates": { "type": "object" },
+    "context_updates": { "type": "object", "properties": {}, "additionalProperties": false },
     "notes": { "type": "string" },
     "failure_reason": { "type": "string" },
     "failure_class": { "type": "string" },
     "failure_signature": { "type": "string" }
   },
-  "required": ["final", "summary"],
+  "required": [
+    "final",
+    "summary",
+    "status",
+    "preferred_label",
+    "suggested_next_ids",
+    "context_updates",
+    "notes",
+    "failure_reason",
+    "failure_class",
+    "failure_signature"
+  ],
   "additionalProperties": false
 }
 `
