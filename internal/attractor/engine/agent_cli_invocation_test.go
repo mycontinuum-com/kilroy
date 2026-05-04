@@ -139,6 +139,7 @@ func TestBuildCodexIsolatedEnv_ConfiguresCodexScopedOverrides(t *testing.T) {
 	// Explicitly unset OPENAI_API_KEY so we exercise the subscription-auth
 	// fallback path (auth.json copied from the user profile).
 	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENAI_BASE_URL", "")
 	stateBase := filepath.Join(t.TempDir(), "codex-state-base")
 	t.Setenv("KILROY_CODEX_STATE_BASE", stateBase)
 
@@ -244,6 +245,7 @@ func TestBuildCodexIsolatedEnv_SeedsFromUserProfileWhenHomeUnset(t *testing.T) {
 	// Exercise the no-apikey fallback path so auth.json is copied from the
 	// user profile rather than written fresh.
 	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENAI_BASE_URL", "")
 	t.Setenv("KILROY_CODEX_STATE_BASE", filepath.Join(t.TempDir(), "codex-state-base"))
 
 	stageDir := t.TempDir()
@@ -308,6 +310,34 @@ func TestBuildCodexIsolatedEnv_WritesFreshApiKeyAuthWhenKeySet(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("auth.json perms: got %#o want %#o", info.Mode().Perm(), 0o600)
+	}
+}
+
+func TestBuildCodexIsolatedEnv_SeedsOpenAIBaseURLConfigWhenSet(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("OPENAI_API_KEY", "sk-test")
+	t.Setenv("OPENAI_BASE_URL", " https://eu.api.openai.com/v1 ")
+	t.Setenv("KILROY_CODEX_STATE_BASE", filepath.Join(t.TempDir(), "codex-state-base"))
+
+	_, meta, err := buildCodexIsolatedEnv(t.TempDir(), os.Environ())
+	if err != nil {
+		t.Fatalf("buildCodexIsolatedEnv: %v", err)
+	}
+
+	stateRoot := strings.TrimSpace(anyToString(meta["state_root"]))
+	configPath := filepath.Join(stateRoot, "config.toml")
+	assertExists(t, configPath)
+	b, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config.toml: %v", err)
+	}
+	got := string(b)
+	if !strings.Contains(got, `base_url = "https://eu.api.openai.com/v1"`) {
+		t.Fatalf("config.toml missing expected base_url, got:\n%s", got)
 	}
 }
 

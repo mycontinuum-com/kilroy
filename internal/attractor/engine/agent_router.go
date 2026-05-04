@@ -1653,6 +1653,7 @@ func buildCodexIsolatedEnvWithName(stageDir string, homeDirName string, baseEnv 
 	// xhigh-rejects-gpt-5-codex case).
 	apiKey := envValueFromBase(baseEnv, "OPENAI_API_KEY")
 	authDst := filepath.Join(codexStateRoot, "auth.json")
+	openAIBaseURL := strings.TrimSpace(envValueFromBase(baseEnv, "OPENAI_BASE_URL"))
 	if apiKey != "" {
 		auth := map[string]string{"auth_mode": "apikey", "OPENAI_API_KEY": apiKey}
 		data, err := json.Marshal(auth)
@@ -1677,6 +1678,23 @@ func buildCodexIsolatedEnvWithName(stageDir string, homeDirName string, baseEnv 
 			} else if copied {
 				seeded = append(seeded, authDst)
 			}
+		}
+	}
+	if openAIBaseURL != "" {
+		cfg := []byte(strings.Join([]string{
+			"[model_providers.openai-custom]",
+			"name = \"OpenAI\"",
+			fmt.Sprintf("base_url = %q", openAIBaseURL),
+			"env_key = \"OPENAI_API_KEY\"",
+			"",
+			"model_provider = \"openai-custom\"",
+			"",
+		}, "\n"))
+		cfgDst := filepath.Join(codexStateRoot, "config.toml")
+		if err := os.WriteFile(cfgDst, cfg, 0o600); err != nil {
+			seedErrors = append(seedErrors, fmt.Sprintf("config.toml: %v", err))
+		} else {
+			seeded = append(seeded, cfgDst)
 		}
 	}
 
