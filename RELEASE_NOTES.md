@@ -6,6 +6,7 @@
 
 ## Things that got better
 
+- **Honor EU OpenAI endpoints in isolated Codex runs** — when `OPENAI_BASE_URL` is set, Kilroy now seeds isolated Codex config with that base URL so provider routing stays correct under run isolation.
 - **Codex sandbox behavior is consistent across runtime, docs, and tests** — the release matches the live `danger-full-access` CLI contract instead of mixing old `workspace-write` guidance with newer runtime behavior.
 - **Release publishing now targets the fork Serenity actually uses** — GitHub release output is configured for `mycontinuum-com/kilroy`, removing the stale upstream namespace assumption.
 - **Holdout routing and scan behavior are easier to reason about** — path-based holdouts now cover the common exact-file, directory, and glob cases with clearer restoration semantics.
