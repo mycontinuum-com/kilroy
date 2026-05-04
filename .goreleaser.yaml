@@ -34,26 +34,9 @@ checksum:
 changelog:
   disable: true
 
-# NOTE: `brews` is the current goreleaser v2 config key for Homebrew formulas.
-# If goreleaser deprecates it in favor of a new key, it will warn at release
-# time. Update the key name if that happens.
-brews:
-  - name: kilroy
-    repository:
-      owner: danshapiro
-      name: kilroy
-    directory: Formula
-    homepage: "https://github.com/danshapiro/kilroy"
-    description: "Local-first CLI for running Attractor pipelines in a git repo"
-    license: "MIT"
-    install: |
-      bin.install "kilroy"
-    test: |
-      system "#{bin}/kilroy", "--version"
-
 release:
   github:
-    owner: danshapiro
+    owner: mycontinuum-com
     name: kilroy
   draft: false
   prerelease: auto
